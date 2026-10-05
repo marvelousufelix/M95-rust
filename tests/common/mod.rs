@@ -33,12 +33,35 @@ pub async fn state() -> Option<AppState> {
     }
     drop(_guard);
 
+    // Create a minimal AppConfig for testing. Most values don't matter; 
+    // we just need config.cngn_issuer to test the feature.
+    let config = aframp::AppConfig {
+        database_url: url.clone(),
+        bind_addr: "127.0.0.1:3000".to_string(),
+        jwt_secret: aframp::SecretString::new("integration-test-secret".to_string()),
+        webhook_secret: aframp::SecretString::new("integration-test-webhook".to_string()),
+        stellar_system_wallet: std::sync::Arc::new("G".to_string() + &"X".repeat(55)),
+        stellar_horizon_url: "https://horizon-testnet.stellar.org".to_string(),
+        stellar_poll_interval_secs: 60,
+        wallet_encryption_key: aframp::SecretString::new(
+            "0707070707070707070707070707070707070707070707070707070707070707".to_string()
+        ),
+        paystack_secret_key: aframp::SecretString::new("sk_test_placeholder".to_string()),
+        cors_allowed_origins: vec!["http://localhost:3001".to_string()],
+        cookie: aframp::CookieConfig {
+            secure: true,
+            same_site: aframp::SameSite::Lax,
+        },
+        cngn_issuer: None,
+    };
+
     Some(AppState {
         db,
-        jwt_secret: Arc::new("integration-test-secret".into()),
-        webhook_secret: Arc::new("integration-test-webhook".into()),
-        wallet_encryption_key: Arc::new([7u8; 32]),
-        payment_provider: Arc::new(aframp::payments::mock::MockProvider),
+        config,
+        jwt_secret: aframp::SecretString::new("integration-test-secret".to_string()),
+        webhook_secret: aframp::SecretString::new("integration-test-webhook".to_string()),
+        wallet_encryption_key: std::sync::Arc::new([7u8; 32]),
+        payment_provider: std::sync::Arc::new(aframp::payments::mock::MockProvider),
         cookie: aframp::CookieConfig {
             secure: true,
             same_site: aframp::SameSite::Lax,

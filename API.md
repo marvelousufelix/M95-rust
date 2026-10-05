@@ -227,7 +227,7 @@ Auth required. **The core POS action.** Creates a request for a specific amount 
 
 **Render `sep7_uri` as the QR code.** It's a [SEP-0007](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0007.md) payment URI that Stellar wallets open natively. Generate the QR client-side (`qrcode`, `react-qr-code`) — the backend returns the string, not an image.
 
-> **`sep7_uri` is `null` for cNGN.** There's no real cNGN issuer address configured yet, and a guessed issuer would silently misdirect a customer's money. Handle the null case — don't render a broken QR. XLM works today.
+> **`sep7_uri` for cNGN depends on issuer configuration.** When `CNGN_ISSUER_ADDRESS` is set to a valid verified Stellar address, cNGN payment requests include a SEP-0007 URI with the asset code and issuer. If unset or invalid, `sep7_uri` is `null` — no guessing to avoid misdirecting customer funds. XLM always has a URI since it's the native asset.
 
 **The `memo` is what links a payment to this request.** A customer paying without it still credits the merchant's balance, but the request stays `pending` forever. The SEP-7 URI includes it automatically; if you ever show manual payment instructions, the memo is mandatory.
 

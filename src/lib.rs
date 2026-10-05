@@ -17,6 +17,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
+    pub config: AppConfig,
     pub jwt_secret: SecretString,
     pub webhook_secret: SecretString,
     pub wallet_encryption_key: std::sync::Arc<[u8; 32]>,
@@ -32,6 +33,7 @@ pub async fn build_state(config: &AppConfig) -> Result<AppState, Box<dyn std::er
     let wallet_encryption_key = blockchain::wallet_crypto::parse_key(config.wallet_encryption_key.as_str())?;
     Ok(AppState {
         db,
+        config: config.clone(),
         jwt_secret: config.jwt_secret.clone(),
         webhook_secret: config.webhook_secret.clone(),
         wallet_encryption_key: std::sync::Arc::new(wallet_encryption_key),
