@@ -60,3 +60,15 @@ pub fn validate_name(name: &str) -> Result<String, &'static str> {
     }
     Ok(trimmed.to_string())
 }
+
+/// Validates that the given string is a valid Stellar public address.
+/// Stellar addresses are 56-character base32-encoded strings starting with 'G'.
+/// Uses the stellar-strkey crate to validate the format and checksum.
+pub fn is_valid_stellar_address(address: &str) -> bool {
+    use stellar_strkey::ed25519::PublicKey;
+    use std::str::FromStr;
+
+    // Try to parse the address as a Stellar public key — this checks format,
+    // length, and checksum all at once.
+    PublicKey::from_str(address).is_ok()
+}

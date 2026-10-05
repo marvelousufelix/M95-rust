@@ -57,7 +57,7 @@ pub async fn create(
     .await
     .map_err(map_payment_request_error)?;
 
-    Ok(Json(to_view(&pr, &wallet.address, &wallet.network)))
+    Ok(Json(to_view(&pr, &wallet.address, &wallet.network, &state.config.cngn_issuer)))
 }
 
 pub async fn get(
@@ -74,7 +74,7 @@ pub async fn get(
         .map_err(internal)?
         .ok_or_else(|| internal("payment request references a missing wallet"))?;
 
-    Ok(Json(to_view(&pr, &wallet.address, &wallet.network)))
+    Ok(Json(to_view(&pr, &wallet.address, &wallet.network, &state.config.cngn_issuer)))
 }
 
 pub async fn list(
@@ -91,7 +91,7 @@ pub async fn list(
         .await
         .map_err(internal)?;
 
-    Ok(Json(rows.iter().map(row_to_view).collect()))
+    Ok(Json(rows.iter().map(|row| row_to_view(row, &state.config.cngn_issuer)).collect()))
 }
 
 #[derive(serde::Deserialize)]
@@ -109,7 +109,7 @@ fn effective_status(status: &str, expires_at: DateTime<Utc>) -> String {
     }
 }
 
-fn to_view(pr: &PaymentRequest, address: &str, network: &str) -> PaymentRequestView {
+fn to_view(pr: &PaymentRequest, address: &str, network: &str, cngn_issuer: &Option<String>) -> PaymentRequestView {
     PaymentRequestView {
         id: pr.id,
         merchant_id: pr.merchant_id,
@@ -121,11 +121,11 @@ fn to_view(pr: &PaymentRequest, address: &str, network: &str) -> PaymentRequestV
         status: effective_status(&pr.status, pr.expires_at),
         expires_at: pr.expires_at,
         created_at: pr.created_at,
-        sep7_uri: build_sep7_uri(address, pr.amount_stroops, &pr.asset, &pr.memo),
+        sep7_uri: build_sep7_uri(address, pr.amount_stroops, &pr.asset, &pr.memo, cngn_issuer),
     }
 }
 
-fn row_to_view(row: &payment_requests::PaymentRequestWithWallet) -> PaymentRequestView {
+fn row_to_view(row: &payment_requests::PaymentRequestWithWallet, cngn_issuer: &Option<String>) -> PaymentRequestView {
     PaymentRequestView {
         id: row.id,
         merchant_id: row.merchant_id,
@@ -137,18 +137,34 @@ fn row_to_view(row: &payment_requests::PaymentRequestWithWallet) -> PaymentReque
         status: effective_status(&row.status, row.expires_at),
         expires_at: row.expires_at,
         created_at: row.created_at,
-        sep7_uri: build_sep7_uri(&row.address, row.amount_stroops, &row.asset, &row.memo),
+        sep7_uri: build_sep7_uri(&row.address, row.amount_stroops, &row.asset, &row.memo, cngn_issuer),
     }
 }
 
-fn build_sep7_uri(address: &str, amount_stroops: i64, asset: &str, memo: &str) -> Option<String> {
-    if asset != "XLM" && asset != "native" {
-        return None;
-    }
+fn build_sep7_uri(address: &str, amount_stroops: i64, asset: &str, memo: &str, cngn_issuer: &Option<String>) -> Option<String> {
     let amount = format!("{}.{:07}", amount_stroops / 10_000_000, amount_stroops % 10_000_000);
-    Some(format!(
-        "web+stellar:pay?destination={address}&amount={amount}&memo={memo}&memo_type=MEMO_TEXT"
-    ))
+    
+    match asset {
+        "XLM" | "native" => {
+            // XLM (native asset) always has a URI since native is built into Stellar.
+            Some(format!(
+                "web+stellar:pay?destination={address}&amount={amount}&memo={memo}&memo_type=MEMO_TEXT"
+            ))
+        }
+        "cNGN" => {
+            // cNGN requires a verified issuer address to generate a URI.
+            // If issuer is not configured or invalid, return None.
+            match cngn_issuer {
+                Some(issuer) => {
+                    Some(format!(
+                        "web+stellar:pay?destination={address}&amount={amount}&asset_code=cNGN&asset_issuer={issuer}&memo={memo}&memo_type=MEMO_TEXT"
+                    ))
+                }
+                None => None,
+            }
+        }
+        _ => None,
+    }
 }
 
 fn map_payment_request_error(

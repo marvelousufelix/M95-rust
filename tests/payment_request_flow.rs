@@ -244,3 +244,127 @@ async fn payment_request_marked_paid_on_memo_correlated_deposit() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(fetched["status"], "paid");
 }
+
+
+#[tokio::test]
+async fn payment_request_xlm_has_sep7_uri_regardless_of_cngn_issuer() {
+    let Some(state) = state().await else {
+        return;
+    };
+    let app = aframp::router(state.clone());
+    let (token, _) = ensure_merchant(&app, "pr_xlm_always_uri").await;
+    create_wallet(&app, &token).await;
+
+    let (status, created) = send(
+        app.clone(),
+        "POST",
+        "/payment-requests",
+        Some(&token),
+        Some(json!({ "amount_stroops": 10_000_000, "asset": "XLM" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "create failed: {created}");
+    assert_eq!(created["asset"], "XLM");
+    let sep7 = created["sep7_uri"].as_str().expect("XLM requests must have a sep7_uri");
+    assert!(sep7.starts_with("web+stellar:pay?destination="));
+    // XLM URIs should NOT include asset_code or asset_issuer (native asset)
+    assert!(!sep7.contains("asset_code="));
+    assert!(!sep7.contains("asset_issuer="));
+}
+
+#[tokio::test]
+async fn payment_request_cngn_with_issuer_has_sep7_uri() {
+    // This test uses the actual cngn_issuer from state.config if set.
+    // If CNGN_ISSUER_ADDRESS is not set in the test environment,
+    // we still test that when it IS set, cNGN URIs are generated correctly.
+    let Some(state) = state().await else {
+        return;
+    };
+
+    // Only run this test if cNGN_ISSUER_ADDRESS is configured.
+    if state.config.cngn_issuer.is_none() {
+        // Skip — issuer not configured, can't test with a real issuer.
+        eprintln!("Skipping test: CNGN_ISSUER_ADDRESS not configured in environment");
+        return;
+    }
+
+    let app = aframp::router(state.clone());
+    let (token, _) = ensure_merchant(&app, "pr_cngn_with_issuer").await;
+    create_wallet(&app, &token).await;
+
+    let (status, created) = send(
+        app.clone(),
+        "POST",
+        "/payment-requests",
+        Some(&token),
+        Some(json!({ "amount_stroops": 10_000_000, "asset": "cNGN" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "create failed: {created}");
+    assert_eq!(created["asset"], "cNGN");
+
+    let sep7 = created["sep7_uri"]
+        .as_str()
+        .expect("cNGN with issuer configured should have a sep7_uri");
+    assert!(sep7.starts_with("web+stellar:pay?destination="));
+    assert!(sep7.contains("asset_code=cNGN"));
+    assert!(sep7.contains(&format!("asset_issuer={}", state.config.cngn_issuer.as_ref().unwrap())));
+    let memo = created["memo"].as_str().unwrap();
+    assert!(sep7.contains(&format!("memo={memo}")));
+}
+
+#[tokio::test]
+async fn payment_request_list_reflects_cngn_issuer_configuration() {
+    let Some(state) = state().await else {
+        return;
+    };
+    let app = aframp::router(state.clone());
+    let (token, _) = ensure_merchant(&app, "pr_list_cngn").await;
+    create_wallet(&app, &token).await;
+
+    // Create both XLM and cNGN requests.
+    let (status, xlm_req) = send(
+        app.clone(),
+        "POST",
+        "/payment-requests",
+        Some(&token),
+        Some(json!({ "amount_stroops": 10_000_000, "asset": "XLM" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "XLM create failed: {xlm_req}");
+
+    let (status, cngn_req) = send(
+        app.clone(),
+        "POST",
+        "/payment-requests",
+        Some(&token),
+        Some(json!({ "amount_stroops": 10_000_000, "asset": "cNGN" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "cNGN create failed: {cngn_req}");
+
+    let (status, list) = send(app.clone(), "GET", "/payment-requests", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK, "list failed: {list}");
+    let rows = list.as_array().unwrap();
+    assert_eq!(rows.len(), 2, "should have both requests");
+
+    // XLM should have a sep7_uri
+    let xlm_row = rows.iter().find(|r| r["asset"] == "XLM").expect("should find XLM request");
+    assert!(xlm_row["sep7_uri"].is_string(), "XLM should have sep7_uri");
+    assert!(xlm_row["sep7_uri"].as_str().unwrap().starts_with("web+stellar:pay?"));
+
+    // cNGN behavior depends on issuer configuration
+    let cngn_row = rows.iter().find(|r| r["asset"] == "cNGN").expect("should find cNGN request");
+    if state.config.cngn_issuer.is_some() {
+        assert!(
+            cngn_row["sep7_uri"].is_string(),
+            "cNGN should have sep7_uri when issuer is configured"
+        );
+        assert!(cngn_row["sep7_uri"].as_str().unwrap().contains("asset_code=cNGN"));
+    } else {
+        assert!(
+            cngn_row["sep7_uri"].is_null(),
+            "cNGN should have null sep7_uri when issuer is not configured"
+        );
+    }
+}

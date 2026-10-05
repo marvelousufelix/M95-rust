@@ -2,6 +2,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::auth::cookie::{CookieConfig, SameSite};
+use crate::validation;
 
 #[derive(Clone)]
 pub struct SecretString(Arc<String>);
@@ -60,6 +61,10 @@ pub struct AppConfig {
     /// `Secure` on, `SameSite=Lax`. Browsers treat localhost as a secure
     /// context, so the defaults also work for local development over HTTP.
     pub cookie: CookieConfig,
+    /// The verified Stellar issuer address for cNGN tokens, allowing us to
+    /// generate SEP-0007 payment URIs that wallets can scan to pay in cNGN.
+    /// Optional: if unset or invalid, cNGN payment requests have no sep7_uri.
+    pub cngn_issuer: Option<String>,
 }
 
 impl AppConfig {
@@ -78,6 +83,25 @@ impl AppConfig {
         if cookie_same_site == SameSite::None && !cookie_secure {
             return Err("COOKIE_SAME_SITE=none requires COOKIE_SECURE=true; browsers reject a SameSite=None cookie that is not Secure".into());
         }
+
+        // Load CNGN_ISSUER_ADDRESS if provided, validating it if present.
+        let cngn_issuer = match std::env::var("CNGN_ISSUER_ADDRESS") {
+            Ok(addr) => {
+                let trimmed = addr.trim();
+                if trimmed.is_empty() {
+                    // Empty string is treated as unset (None).
+                    None
+                } else if validation::is_valid_stellar_address(trimmed) {
+                    Some(trimmed.to_string())
+                } else {
+                    return Err(format!("CNGN_ISSUER_ADDRESS is not a valid Stellar address: {trimmed}"));
+                }
+            }
+            Err(_) => {
+                // Not set — cNGN URIs won't be generated until this is configured.
+                None
+            }
+        };
 
         Ok(Self {
             database_url: env("DATABASE_URL")?,
@@ -103,6 +127,7 @@ impl AppConfig {
                 secure: cookie_secure,
                 same_site: cookie_same_site,
             },
+            cngn_issuer,
         })
     }
 }
@@ -161,6 +186,7 @@ mod tests {
                     secure: true,
                     same_site: SameSite::Lax,
                 },
+                cngn_issuer: None,
             }
         );
         assert!(!config_debug.contains("jwt-secret-value"));
