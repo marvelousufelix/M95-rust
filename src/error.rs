@@ -11,6 +11,7 @@ pub enum ErrorCode {
     InvalidAmount,
     InsufficientBalance,
     UnsupportedAsset,
+    PayoutNotReady,
     PayoutFailed,
     EmailTaken,
     InvalidCredentials,
@@ -34,6 +35,7 @@ impl ErrorCode {
             ErrorCode::InvalidAmount => "INVALID_AMOUNT",
             ErrorCode::InsufficientBalance => "INSUFFICIENT_BALANCE",
             ErrorCode::UnsupportedAsset => "UNSUPPORTED_ASSET",
+            ErrorCode::PayoutNotReady => "PAYOUT_NOT_READY",
             ErrorCode::PayoutFailed => "PAYOUT_FAILED",
             ErrorCode::EmailTaken => "EMAIL_TAKEN",
             ErrorCode::InvalidCredentials => "INVALID_CREDENTIALS",
@@ -49,6 +51,8 @@ impl ErrorCode {
 #[derive(Serialize)]
 pub struct ApiError {
     pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
 }
@@ -66,6 +70,7 @@ pub fn bad_request_field(field: &str, message: &str) -> (StatusCode, Json<ApiErr
         StatusCode::BAD_REQUEST,
         Json(ApiError {
             error: message.into(),
+            code: None,
             field: Some(field.into()),
         }),
     )
@@ -100,11 +105,12 @@ pub fn internal<E: std::fmt::Display>(err: E) -> (StatusCode, Json<ApiError>) {
     )
 }
 
-fn error(status: StatusCode, _code: ErrorCode, message: &str) -> (StatusCode, Json<ApiError>) {
+fn error(status: StatusCode, code: ErrorCode, message: &str) -> (StatusCode, Json<ApiError>) {
     (
         status,
         Json(ApiError {
             error: message.into(),
+            code: Some(code.as_str().to_string()),
             field: None,
         }),
     )

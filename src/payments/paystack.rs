@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
-use super::{PaymentProvider, PayoutRequest, PayoutResult};
+use super::{PaymentProvider, PayoutReadiness, PayoutRequest, PayoutResult};
 
 const BASE_URL: &str = "https://api.paystack.co";
 
@@ -80,8 +80,44 @@ struct Transfer {
     status: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct BalanceInfo {
+    balance: i64,
+}
+
 #[async_trait]
 impl PaymentProvider for PaystackProvider {
+    async fn check_payout_readiness(&self) -> Result<PayoutReadiness, String> {
+        // Query Paystack's balance endpoint to get the account's available NGN balance.
+        // This is the primary signal for whether the account can fund transfers.
+        match self.get::<BalanceInfo>("/balance", &[]).await {
+            Ok(balance_info) => {
+                let is_ready = balance_info.balance > 0;
+                let message = if is_ready {
+                    format!("Paystack account has sufficient balance (₦{})", balance_info.balance / 100)
+                } else {
+                    "Paystack account balance is zero or negative; transfers cannot be funded".into()
+                };
+                Ok(PayoutReadiness {
+                    is_ready,
+                    available_balance: Some(balance_info.balance),
+                    message,
+                })
+            }
+            Err(err) => {
+                // If the balance check itself fails (network error, auth issue, etc.),
+                // report it as a readiness failure so the merchant sees a clear error
+                // instead of silently proceeding to a payout that will also fail.
+                tracing::warn!(error = %err, "payout readiness check failed");
+                Ok(PayoutReadiness {
+                    is_ready: false,
+                    available_balance: None,
+                    message: format!("Unable to verify Paystack account status: {err}"),
+                })
+            }
+        }
+    }
+
     async fn create_payout(&self, req: &PayoutRequest) -> Result<PayoutResult, String> {
         let amount_kobo: i64 = req
             .amount

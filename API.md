@@ -77,13 +77,14 @@ Every error returns the same shape — a human-readable `error` string plus a st
 | `INVALID_AMOUNT` | `400` | Amount is not positive, or not a whole number of kobo |
 | `INSUFFICIENT_BALANCE` | `400` | Withdrawal exceeds the available balance |
 | `UNSUPPORTED_ASSET` | `400` | Withdrawal asset isn't cNGN |
+| `PAYOUT_NOT_READY` | `400` | Payout provider account does not have sufficient funding |
+| `PAYOUT_FAILED` | `502` | Upstream payment provider rejected the payout |
 | `EMAIL_TAKEN` | `409` | Signup email already registered |
 | `INVALID_CREDENTIALS` | `401` | Wrong password or unknown email on login |
 | `USER_NOT_FOUND` | `404` | Authenticated user no longer exists |
 | `MERCHANT_NOT_FOUND` | `400` | Account has no merchant (visit onboarding) |
 | `WALLET_NOT_FOUND` | `400` | No wallet yet, or none created before a payment-request call |
 | `PAYMENT_REQUEST_NOT_FOUND` | `404` | Payment request id doesn't exist |
-| `PAYOUT_FAILED` | `502` | Upstream payment provider rejected the payout |
 | `INTERNAL_ERROR` | `500` | Unexpected server error; generic message only |
 
 ---
@@ -323,7 +324,24 @@ Auth required. Debits the merchant's balance and initiates a Nigerian bank payou
 
 Validation errors (`400`): `"insufficient available balance"`, `"withdrawals are only supported for the cNGN asset"`, `"amount_stroops must be a whole number of kobo"`, `"positive amount_stroops, bank_code, and a 10-digit account_number are required"`.
 
-> **Payouts do not currently complete.** The Paystack integration is real and correct, but Aframp's Paystack balance is unfunded, so live calls return `502` with *"Your balance is not enough to fulfil this request."* On failure the balance is **automatically refunded** and the withdrawal is recorded with `status: "failed"` and a `failure_reason` — no money or ledger record is lost. Treat `502` as "try later," not as data loss. Paystack's own minimum transfer is ₦50 = `500000000` stroops.
+> **Payout readiness check.** Before a withdrawal is debited from the merchant's balance, the server verifies that the configured payout provider (Paystack) has sufficient funding to process transfers. If the payout account is unfunded, the request returns `400` with `PAYOUT_NOT_READY` and **the merchant balance is NOT debited** — no funds are lost and no withdrawal record is created. This prevents the dangerous condition where a merchant's balance is reduced but no payout completes.
+>
+> **When payouts fail after balance is debited:** If the readiness check passes but the actual payout to Paystack fails (e.g., network error, invalid bank details), the balance is **automatically refunded** and the withdrawal is recorded with `status: "failed"` and a `failure_reason` — no money or ledger record is lost. This compensating refund is a separate atomic transaction, preserving an audit trail.
+>
+> **Paystack's balance status:** Aframp's Paystack account must be funded (NGN balance > 0) for payouts to complete. This depends on external settlement (Stage A in the PRD) — see the operations section below.
+
+### Operations: Enabling payouts
+
+**Current state:** Paystack's Transfers API is integrated and live-tested, but Aframp's Paystack account has zero balance. Withdrawal requests are rejected upfront with `PAYOUT_NOT_READY`.
+
+**To enable payouts:**
+
+1. Fund Aframp's Paystack account with NGN.
+2. Verify with a test transfer: call `POST /withdraw` with a small amount (≥ ₦50 = `500000000` stroops).
+3. If successful, the `status` will be `pending` or the provider-specific completion status. The merchant's balance is debited and the bank transfer is in flight.
+4. Monitor `GET /withdrawals` to confirm completion.
+
+Once Paystack account balance > 0, the readiness check will pass and withdrawals will proceed.
 
 ### `GET /withdrawals`
 Auth required. Newest first. Query: `?limit=` (default 50, clamped 1–200).
@@ -341,7 +359,7 @@ Auth required. Newest first. Query: `?limit=` (default 50, clamped 1–200).
     "provider_reference": null,
     "bank_code": "999992",
     "account_number": "8038714250",
-    "failure_reason": "Paystack error (HTTP 400 Bad Request): Your balance is not enough to fulfil this request",
+    "failure_reason": "payout not ready: Paystack account balance is zero or negative; transfers cannot be funded",
     "created_at": "2026-08-13T17:10:50.729251Z",
     "updated_at": "2026-08-13T17:10:52.853489Z"
   }
