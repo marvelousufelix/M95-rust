@@ -16,6 +16,8 @@ pub enum WithdrawalError {
     UnsupportedAsset,
     #[error("amount_stroops must be a whole number of kobo (a multiple of {STROOPS_PER_KOBO})")]
     InvalidAmountPrecision,
+    #[error("payout provider is not ready: {0}")]
+    PayoutNotReady(String),
     #[error("payout provider failed: {0}")]
     PayoutFailed(String),
     #[error(transparent)]
@@ -33,6 +35,18 @@ pub async fn create_withdrawal(
     if withdrawal.amount_stroops % STROOPS_PER_KOBO != 0 {
         return Err(WithdrawalError::InvalidAmountPrecision);
     }
+
+    // Check payout readiness BEFORE debiting the balance. This prevents a merchant
+    // from losing funds when no payout is actually possible.
+    let readiness = provider
+        .check_payout_readiness()
+        .await
+        .map_err(|e| WithdrawalError::PayoutFailed(format!("failed to check payout readiness: {e}")))?;
+
+    if !readiness.is_ready {
+        return Err(WithdrawalError::PayoutNotReady(readiness.message));
+    }
+
     let amount_kobo = withdrawal.amount_stroops / STROOPS_PER_KOBO;
 
     let mut tx = db.begin().await?;

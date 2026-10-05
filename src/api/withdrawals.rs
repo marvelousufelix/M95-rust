@@ -81,6 +81,10 @@ fn map_withdrawal_error(err: WithdrawalError) -> (axum::http::StatusCode, Json<c
             ErrorCode::InvalidAmount,
             "amount_stroops must be a whole number of kobo",
         ),
+        WithdrawalError::PayoutNotReady(msg) => bad_request(
+            ErrorCode::PayoutNotReady,
+            &format!("payout not ready: {msg}"),
+        ),
         WithdrawalError::PayoutFailed(msg) => bad_gateway(ErrorCode::PayoutFailed, &msg),
         WithdrawalError::Database(e) => internal(e),
     }
