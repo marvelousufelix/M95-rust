@@ -19,6 +19,9 @@ pub struct DetectedDeposit {
     /// The parent transaction's memo, if any — used to correlate a deposit to
     /// a specific payment request rather than just "something arrived."
     pub memo: Option<String>,
+    /// The Stellar ledger sequence where this transaction was confirmed.
+    /// Used to calculate confirmation progress toward the finality threshold.
+    pub confirmation_ledger: i64,
 }
 
 #[async_trait]
@@ -159,6 +162,10 @@ struct OperationRecord {
     claimant: Option<ClaimantInfo>,
     #[serde(default)]
     transaction: Option<EmbeddedTransaction>,
+    /// The ledger sequence where this operation was confirmed. Horizon includes this
+    /// at the operation level in addition to the transaction level.
+    #[serde(default)]
+    ledger_sequence: i64,
 }
 
 /// Horizon wraps each claimant in the `claimants` array.  For the
@@ -173,6 +180,9 @@ struct ClaimantInfo {
 struct EmbeddedTransaction {
     #[serde(default)]
     memo: Option<String>,
+    /// The ledger sequence where this transaction was confirmed on the Stellar network.
+    #[serde(default)]
+    ledger_sequence: i64,
 }
 
 /// Distinguishes a funded account (200 OK) from an unfunded one (404) so the
@@ -284,6 +294,13 @@ fn record_to_deposit(record: OperationRecord, address: &str) -> Option<DetectedD
     };
 
     let memo = record.transaction.as_ref().and_then(|t| t.memo.clone());
+    
+    // Use confirmation_ledger from the transaction if available, otherwise from the operation.
+    let confirmation_ledger = record
+        .transaction
+        .as_ref()
+        .and_then(|t| if t.ledger_sequence > 0 { Some(t.ledger_sequence) } else { None })
+        .unwrap_or(record.ledger_sequence);
 
     Some(DetectedDeposit {
         tx_hash: record.transaction_hash,
@@ -292,6 +309,7 @@ fn record_to_deposit(record: OperationRecord, address: &str) -> Option<DetectedD
         asset,
         confirmations: 1,
         memo,
+        confirmation_ledger,
     })
 }
 
@@ -347,6 +365,7 @@ mod tests {
             asset: None,
             claimant: None,
             transaction: None,
+            ledger_sequence: 47118521, // Default ledger sequence for tests
         }
     }
 
