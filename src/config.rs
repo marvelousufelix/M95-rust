@@ -65,6 +65,17 @@ pub struct AppConfig {
     /// generate SEP-0007 payment URIs that wallets can scan to pay in cNGN.
     /// Optional: if unset or invalid, cNGN payment requests have no sep7_uri.
     pub cngn_issuer: Option<String>,
+    /// Login rate limiting configuration.
+    pub login_rate_limit: LoginRateLimitConfig,
+}
+
+/// Configuration for login endpoint rate limiting.
+#[derive(Clone, Debug)]
+pub struct LoginRateLimitConfig {
+    /// Maximum number of login attempts allowed per window.
+    pub max_attempts: u32,
+    /// Time window in seconds for rate limiting.
+    pub window_secs: u64,
 }
 
 impl AppConfig {
@@ -128,6 +139,16 @@ impl AppConfig {
                 same_site: cookie_same_site,
             },
             cngn_issuer,
+            login_rate_limit: LoginRateLimitConfig {
+                max_attempts: std::env::var("LOGIN_RATE_LIMIT_MAX_ATTEMPTS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(5),
+                window_secs: std::env::var("LOGIN_RATE_LIMIT_WINDOW_SECS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(300),
+            },
         })
     }
 }

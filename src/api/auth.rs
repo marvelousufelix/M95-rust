@@ -46,19 +46,39 @@ pub async fn login(
     if !is_valid_email(&req.email) {
         return Err(bad_request_field("email", "must be a valid email address"));
     }
-    let (user, merchant) = users::login(&state.db, &req.email, &req.password)
-        .await
-        .map_err(map_user_error)?;
-    let token = jwt::sign(&state.jwt_secret, user.id, merchant.as_ref().map(|m| m.id))
-        .map_err(internal)?;
-    authenticated(
-        &state,
-        AuthResponse {
-            token,
-            user_id: user.id,
-            merchant_id: merchant.map(|m| m.id),
-        },
-    )
+
+    // Check rate limit before attempting login
+    match state.login_rate_limiter.check_and_record(
+        &req.email,
+        state.config.login_rate_limit.max_attempts,
+        state.config.login_rate_limit.window_secs,
+    ) {
+        Err(retry_after) => {
+            return Err(crate::error::too_many_requests(
+                "too many login attempts, please try again later",
+                retry_after,
+            ));
+        }
+        Ok(()) => {}
+    }
+
+    match users::login(&state.db, &req.email, &req.password).await {
+        Ok((user, merchant)) => {
+            let token = jwt::sign(&state.jwt_secret, user.id, merchant.as_ref().map(|m| m.id))
+                .map_err(internal)?;
+            // Clear rate limit on successful login
+            state.login_rate_limiter.reset(&req.email);
+            authenticated(
+                &state,
+                AuthResponse {
+                    token,
+                    user_id: user.id,
+                    merchant_id: merchant.map(|m| m.id),
+                },
+            )
+        }
+        Err(err) => Err(map_user_error(err)),
+    }
 }
 
 /// Drops the session cookie. Deliberately unauthenticated: a browser holding an

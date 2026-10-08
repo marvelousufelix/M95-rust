@@ -23,6 +23,7 @@ pub struct AppState {
     pub wallet_encryption_key: std::sync::Arc<[u8; 32]>,
     pub payment_provider: std::sync::Arc<dyn payments::PaymentProvider>,
     pub cookie: CookieConfig,
+    pub login_rate_limiter: std::sync::Arc<services::login_rate_limit::LoginRateLimiter>,
 }
 
 pub async fn build_state(config: &AppConfig) -> Result<AppState, Box<dyn std::error::Error>> {
@@ -41,6 +42,7 @@ pub async fn build_state(config: &AppConfig) -> Result<AppState, Box<dyn std::er
             config.paystack_secret_key.as_str().to_string(),
         )),
         cookie: config.cookie,
+        login_rate_limiter: std::sync::Arc::new(services::login_rate_limit::LoginRateLimiter::new()),
     })
 }
 
