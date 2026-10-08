@@ -67,6 +67,8 @@ pub struct AppConfig {
     pub cngn_issuer: Option<String>,
     /// Login rate limiting configuration.
     pub login_rate_limit: LoginRateLimitConfig,
+    /// Settlement pipeline configuration.
+    pub settlement: SettlementConfig,
 }
 
 /// Configuration for login endpoint rate limiting.
@@ -76,6 +78,35 @@ pub struct LoginRateLimitConfig {
     pub max_attempts: u32,
     /// Time window in seconds for rate limiting.
     pub window_secs: u64,
+}
+
+/// Configuration for the settlement pipeline (sweep, redemption, and payout flow).
+#[derive(Clone, Debug)]
+pub struct SettlementConfig {
+    /// Whether the settlement pipeline is enabled globally.
+    pub enabled: bool,
+    /// How often the settlement worker runs (in seconds).
+    pub interval_secs: u64,
+    /// Optional: lock settlement cycles to a specific UTC hour each day (e.g., "02:00").
+    /// When set, the worker only processes during that hour.
+    pub window_start_utc: Option<String>,
+    /// Minimum cNGN balance (in stroops) required to trigger a sweep.
+    pub min_balance_stroops: i64,
+    /// Maximum retry attempts per batch before marking terminal_failed.
+    pub max_retries: i32,
+    /// Issuer API configuration (URL and credentials).
+    pub issuer: IssuerConfig,
+}
+
+/// Configuration for the approved cNGN issuer's redemption API.
+#[derive(Clone, Debug)]
+pub struct IssuerConfig {
+    /// The issuer's redemption API endpoint URL.
+    pub api_url: String,
+    /// API credentials (bearer token, API key, etc.). Stored as SecretString.
+    pub api_key: SecretString,
+    /// Timeout for issuer API calls (in seconds).
+    pub max_timeout_secs: u64,
 }
 
 impl AppConfig {
@@ -148,6 +179,34 @@ impl AppConfig {
                     .ok()
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(300),
+            },
+            settlement: SettlementConfig {
+                enabled: flag("SETTLEMENT_ENABLED", false)?,
+                interval_secs: std::env::var("SETTLEMENT_INTERVAL_SECS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(3600),
+                window_start_utc: std::env::var("SETTLEMENT_WINDOW_START_UTC").ok(),
+                min_balance_stroops: std::env::var("SETTLEMENT_MIN_BALANCE_STROOPS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(10_000_000), // ~10 cNGN
+                max_retries: std::env::var("SETTLEMENT_MAX_RETRIES")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(5),
+                issuer: IssuerConfig {
+                    api_url: std::env::var("SETTLEMENT_ISSUER_API_URL")
+                        .unwrap_or_else(|_| String::new()),
+                    api_key: SecretString::new(
+                        std::env::var("SETTLEMENT_ISSUER_API_KEY")
+                            .unwrap_or_else(|_| String::new()),
+                    ),
+                    max_timeout_secs: std::env::var("SETTLEMENT_ISSUER_MAX_TIMEOUT_SECS")
+                        .ok()
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(30),
+                },
             },
         })
     }
