@@ -19,6 +19,7 @@ pub enum ErrorCode {
     MerchantNotFound,
     WalletNotFound,
     PaymentRequestNotFound,
+    TooManyRequests,
     InternalError,
 }
 
@@ -43,6 +44,7 @@ impl ErrorCode {
             ErrorCode::MerchantNotFound => "MERCHANT_NOT_FOUND",
             ErrorCode::WalletNotFound => "WALLET_NOT_FOUND",
             ErrorCode::PaymentRequestNotFound => "PAYMENT_REQUEST_NOT_FOUND",
+            ErrorCode::TooManyRequests => "TOO_MANY_REQUESTS",
             ErrorCode::InternalError => "INTERNAL_ERROR",
         }
     }
@@ -94,6 +96,19 @@ pub fn unauthorized(code: ErrorCode, message: &str) -> (StatusCode, Json<ApiErro
 
 pub fn bad_gateway(code: ErrorCode, message: &str) -> (StatusCode, Json<ApiError>) {
     error(StatusCode::BAD_GATEWAY, code, message)
+}
+
+pub fn too_many_requests(message: &str, retry_after_secs: u64) -> (StatusCode, impl axum::response::IntoResponse) {
+    let error_response = Json(ApiError {
+        error: message.into(),
+        code: Some(ErrorCode::TooManyRequests.as_str().to_string()),
+        field: None,
+    });
+    let headers = [(
+        axum::http::header::RETRY_AFTER,
+        retry_after_secs.to_string(),
+    )];
+    (StatusCode::TOO_MANY_REQUESTS, (headers, error_response))
 }
 
 pub fn internal<E: std::fmt::Display>(err: E) -> (StatusCode, Json<ApiError>) {
