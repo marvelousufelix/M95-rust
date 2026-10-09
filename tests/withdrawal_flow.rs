@@ -13,6 +13,14 @@ struct FailingProvider;
 
 #[async_trait]
 impl PaymentProvider for FailingProvider {
+    async fn check_payout_readiness(&self) -> Result<aframp::payments::PayoutReadiness, String> {
+        Ok(aframp::payments::PayoutReadiness {
+            is_ready: true,
+            available_balance: None,
+            message: "mock always ready".into(),
+        })
+    }
+
     async fn create_payout(&self, _req: &PayoutRequest) -> Result<PayoutResult, String> {
         Err("simulated provider failure".into())
     }
@@ -20,9 +28,7 @@ impl PaymentProvider for FailingProvider {
 
 #[tokio::test]
 async fn withdrawal_insufficient_balance_rejected() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _) = ensure_merchant(&app, "insufficient").await;
 
@@ -45,9 +51,7 @@ async fn withdrawal_insufficient_balance_rejected() {
 
 #[tokio::test]
 async fn withdrawal_validates_bank_details() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _) = ensure_merchant(&app, "validation").await;
 
@@ -68,9 +72,7 @@ async fn withdrawal_validates_bank_details() {
 
 #[tokio::test]
 async fn withdrawal_success_decrements_balance() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, merchant_id) = ensure_merchant(&app, "withdraw_ok").await;
 
@@ -117,9 +119,7 @@ async fn withdrawal_success_decrements_balance() {
 
 #[tokio::test]
 async fn withdrawal_full_balance_then_insufficient() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, merchant_id) = ensure_merchant(&app, "drain").await;
 
@@ -163,9 +163,7 @@ async fn withdrawal_full_balance_then_insufficient() {
 
 #[tokio::test]
 async fn withdrawal_unsupported_asset_rejected() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, merchant_id) = ensure_merchant(&app, "unsupported_asset").await;
 
@@ -197,9 +195,7 @@ async fn withdrawal_unsupported_asset_rejected() {
 
 #[tokio::test]
 async fn withdrawal_rejects_sub_kobo_precision() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, merchant_id) = ensure_merchant(&app, "precision").await;
 
@@ -233,9 +229,7 @@ async fn withdrawal_rejects_sub_kobo_precision() {
 
 #[tokio::test]
 async fn withdrawal_payout_failure_refunds_balance_and_records_reason() {
-    let Some(mut state) = state().await else {
-        return;
-    };
+    let mut state = state().await;
     // Swap in a provider that always fails, to exercise the compensating
     // refund + audit-trail path without needing a real Paystack failure.
     state.payment_provider = Arc::new(FailingProvider);

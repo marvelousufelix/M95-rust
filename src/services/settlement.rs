@@ -468,7 +468,7 @@ impl AuditLogService {
 /// wallet IDs, tx hashes, or other sensitive info in error messages.
 pub fn sanitise_error_message(error: &str) -> String {
     // Map known error patterns to safe categories
-    if error.contains("timeout") || error.contains("deadline exceeded") {
+    if error.contains("timeout") || error.contains("timed out") || error.contains("deadline exceeded") {
         "network_timeout".to_string()
     } else if error.contains("connection refused") || error.contains("unreachable") {
         "network_unreachable".to_string()

@@ -359,6 +359,7 @@ mod tests {
             destination: None,
             account: None,
             amount: None,
+            amount_sent: None,
             starting_balance: None,
             asset_type: Some("native".to_string()),
             asset_code: None,

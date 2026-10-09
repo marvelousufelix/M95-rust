@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "feat/**", "fix/**"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+  # Isolated test database — matches the service definition below.
+  TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/m95_test
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: m95_test
+        ports:
+          - 5432:5432
+        # Wait until Postgres is accepting connections before running steps.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry & build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Lint (clippy)
+        run: cargo clippy -- -D warnings
+
+      - name: Build
+        run: cargo build --locked
+
+      - name: Run unit tests (no database required)
+        run: cargo test --lib
+
+      - name: Run integration tests (requires Postgres)
+        run: cargo test --tests
+        # TEST_DATABASE_URL is set via the env block above.
+        # If the variable is missing or the database is unreachable,
+        # the test harness panics with an actionable error message.

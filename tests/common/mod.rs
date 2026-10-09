@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
-use aframp::AppState;
+use aframp::{AppState, LoginRateLimitConfig, SettlementConfig, IssuerConfig};
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::Router;
@@ -12,17 +12,27 @@ use tower::ServiceExt;
 static MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 static MIGRATED: AtomicBool = AtomicBool::new(false);
 
-pub async fn state() -> Option<AppState> {
-    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
-        return None;
-    };
-    let db = match PgPoolOptions::new().max_connections(5).connect(&url).await {
-        Ok(pool) => pool,
-        Err(err) => {
-            eprintln!("TEST_DATABASE_URL could not be reached: {err}");
-            return None;
-        }
-    };
+pub async fn state() -> AppState {
+    let url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+        panic!(
+            "\n\nMissing TEST_DATABASE_URL.\n\
+             Integration tests require a running PostgreSQL instance.\n\
+             Start one and re-run with:\n\n  \
+             TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/m95_test cargo test\n\n\
+             See WORKFLOW.md §Testing for full setup instructions.\n"
+        )
+    });
+    let db = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&url)
+        .await
+        .unwrap_or_else(|err| {
+            panic!(
+                "\n\nCould not connect to TEST_DATABASE_URL ({url}):\n  {err}\n\n\
+                 Ensure Postgres is running and the database exists.\n\
+                 See WORKFLOW.md §Testing for setup instructions.\n"
+            )
+        });
 
     let _guard = MIGRATION_LOCK.lock().unwrap();
     if !MIGRATED.swap(true, Ordering::SeqCst) {
@@ -53,9 +63,25 @@ pub async fn state() -> Option<AppState> {
             same_site: aframp::SameSite::Lax,
         },
         cngn_issuer: None,
+        login_rate_limit: LoginRateLimitConfig {
+            max_attempts: 5,
+            window_secs: 300,
+        },
+        settlement: SettlementConfig {
+            enabled: false,
+            interval_secs: 300,
+            window_start_utc: None,
+            min_balance_stroops: 1000000,
+            max_retries: 3,
+            issuer: IssuerConfig {
+                api_url: "https://issuer-api.example.com".to_string(),
+                api_key: aframp::SecretString::new("test-key".to_string()),
+                max_timeout_secs: 30,
+            },
+        },
     };
 
-    Some(AppState {
+    AppState {
         db,
         config,
         jwt_secret: aframp::SecretString::new("integration-test-secret".to_string()),
@@ -66,7 +92,8 @@ pub async fn state() -> Option<AppState> {
             secure: true,
             same_site: aframp::SameSite::Lax,
         },
-    })
+        login_rate_limiter: std::sync::Arc::new(aframp::services::login_rate_limit::LoginRateLimiter::new()),
+    }
 }
 
 pub async fn send(

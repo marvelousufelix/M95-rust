@@ -70,9 +70,7 @@ impl PaymentProvider for CheckFailureProvider {
 
 #[tokio::test]
 async fn withdrawal_succeeds_when_payout_ready() {
-    let Some(mut state) = state().await else {
-        return;
-    };
+    let mut state = state().await;
     state.payment_provider = Arc::new(ReadyProvider);
     let app = aframp::router(state.clone());
     let (token, merchant_id) = ensure_merchant(&app, "payout_ready").await;
@@ -120,9 +118,7 @@ async fn withdrawal_succeeds_when_payout_ready() {
 
 #[tokio::test]
 async fn withdrawal_rejected_when_payout_not_ready() {
-    let Some(mut state) = state().await else {
-        return;
-    };
+    let mut state = state().await;
     state.payment_provider = Arc::new(UnreadyProvider);
     let app = aframp::router(state.clone());
     let (token, merchant_id) = ensure_merchant(&app, "payout_not_ready").await;
@@ -187,9 +183,7 @@ async fn withdrawal_rejected_when_payout_not_ready() {
 
 #[tokio::test]
 async fn withdrawal_rejected_when_readiness_check_fails() {
-    let Some(mut state) = state().await else {
-        return;
-    };
+    let mut state = state().await;
     state.payment_provider = Arc::new(CheckFailureProvider);
     let app = aframp::router(state.clone());
     let (token, merchant_id) = ensure_merchant(&app, "readiness_check_fail").await;
@@ -249,9 +243,7 @@ async fn withdrawal_rejected_when_readiness_check_fails() {
 
 #[tokio::test]
 async fn withdrawal_balance_preserved_across_ready_and_unready() {
-    let Some(mut state) = state().await else {
-        return;
-    };
+    let mut state = state().await;
 
     // First, set provider to ready and do a successful withdrawal
     state.payment_provider = Arc::new(ReadyProvider);

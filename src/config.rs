@@ -267,6 +267,22 @@ mod tests {
                     same_site: SameSite::Lax,
                 },
                 cngn_issuer: None,
+                login_rate_limit: LoginRateLimitConfig {
+                    max_attempts: 5,
+                    window_secs: 300,
+                },
+                settlement: SettlementConfig {
+                    enabled: false,
+                    interval_secs: 3600,
+                    window_start_utc: None,
+                    min_balance_stroops: 10_000_000,
+                    max_retries: 5,
+                    issuer: IssuerConfig {
+                        api_url: String::new(),
+                        api_key: SecretString::new(String::new()),
+                        max_timeout_secs: 30,
+                    },
+                },
             }
         );
         assert!(!config_debug.contains("jwt-secret-value"));
