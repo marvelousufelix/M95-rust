@@ -185,14 +185,25 @@ cargo clippy -- -D warnings
 
 ### Test Database Setup
 
-**IMPORTANT:** Integration tests need a separate test database. Without `TEST_DATABASE_URL`, tests will silently skip and report false "ok" results.
+Integration tests require a dedicated PostgreSQL database. If `TEST_DATABASE_URL`
+is not set, the test harness **panics immediately** with an actionable error
+message rather than silently passing — so a missing variable cannot hide failing
+tests.
 
 ```bash
 # 1. Create test database (one-time setup)
 docker exec -i aframp-postgres psql -U postgres -c "CREATE DATABASE aframp_test;"
 
-# 2. Always run tests with TEST_DATABASE_URL set
+# 2. Always run integration tests with TEST_DATABASE_URL set
 TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/aframp_test cargo test
+```
+
+Unit tests (library-internal tests that do not touch the database) can still be
+run without Postgres:
+
+```bash
+# Unit tests only — no database required
+cargo test --lib
 ```
 
 ### Test Commands
@@ -455,14 +466,25 @@ docker exec -it aframp-postgres psql -U postgres -d aframp \
 docker exec -i aframp-postgres psql -U postgres -d aframp < migrations/XXXX_name.sql
 ```
 
-### Tests Passing But Database Not Used
+### Integration Tests Failing With "Missing TEST_DATABASE_URL"
 
-**Problem:** Tests report "ok" but don't actually connect to database.
+**Problem:** Test run panics with:
 
-**Solution:** Always set `TEST_DATABASE_URL`:
+```
+Missing TEST_DATABASE_URL.
+Integration tests require a running PostgreSQL instance.
+```
+
+**Solution:** Set `TEST_DATABASE_URL` before running the integration suite:
 
 ```bash
 TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/aframp_test cargo test
+```
+
+To run only unit tests (no database required):
+
+```bash
+cargo test --lib
 ```
 
 ### Cargo Build Errors

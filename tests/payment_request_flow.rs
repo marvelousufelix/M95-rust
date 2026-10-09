@@ -12,9 +12,7 @@ async fn create_wallet(app: &axum::Router, token: &str) {
 
 #[tokio::test]
 async fn payment_request_requires_wallet() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _) = ensure_merchant(&app, "pr_no_wallet").await;
 
@@ -32,9 +30,7 @@ async fn payment_request_requires_wallet() {
 
 #[tokio::test]
 async fn payment_request_create_and_fetch_publicly() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, merchant_id) = ensure_merchant(&app, "pr_create").await;
     create_wallet(&app, &token).await;
@@ -67,9 +63,7 @@ async fn payment_request_create_and_fetch_publicly() {
 
 #[tokio::test]
 async fn payment_request_cngn_has_no_sep7_uri_yet() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _) = ensure_merchant(&app, "pr_cngn").await;
     create_wallet(&app, &token).await;
@@ -92,9 +86,7 @@ async fn payment_request_cngn_has_no_sep7_uri_yet() {
 
 #[tokio::test]
 async fn payment_request_reports_expired_past_its_expiry() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _) = ensure_merchant(&app, "pr_expiry").await;
     create_wallet(&app, &token).await;
@@ -124,9 +116,7 @@ async fn payment_request_reports_expired_past_its_expiry() {
 
 #[tokio::test]
 async fn payment_request_list_is_scoped_to_the_authenticated_merchant() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
 
     let (token_a, _) = ensure_merchant(&app, "pr_list_a").await;
@@ -176,9 +166,7 @@ async fn payment_request_list_is_scoped_to_the_authenticated_merchant() {
 
 #[tokio::test]
 async fn payment_request_list_requires_auth() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (status, _) = send(app.clone(), "GET", "/payment-requests", None, None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
@@ -186,9 +174,7 @@ async fn payment_request_list_requires_auth() {
 
 #[tokio::test]
 async fn payment_request_marked_paid_on_memo_correlated_deposit() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _) = ensure_merchant(&app, "pr_paid").await;
     create_wallet(&app, &token).await;
@@ -248,9 +234,7 @@ async fn payment_request_marked_paid_on_memo_correlated_deposit() {
 
 #[tokio::test]
 async fn payment_request_xlm_has_sep7_uri_regardless_of_cngn_issuer() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _) = ensure_merchant(&app, "pr_xlm_always_uri").await;
     create_wallet(&app, &token).await;
@@ -277,9 +261,7 @@ async fn payment_request_cngn_with_issuer_has_sep7_uri() {
     // This test uses the actual cngn_issuer from state.config if set.
     // If CNGN_ISSUER_ADDRESS is not set in the test environment,
     // we still test that when it IS set, cNGN URIs are generated correctly.
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
 
     // Only run this test if cNGN_ISSUER_ADDRESS is configured.
     if state.config.cngn_issuer.is_none() {
@@ -315,9 +297,7 @@ async fn payment_request_cngn_with_issuer_has_sep7_uri() {
 
 #[tokio::test]
 async fn payment_request_list_reflects_cngn_issuer_configuration() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _) = ensure_merchant(&app, "pr_list_cngn").await;
     create_wallet(&app, &token).await;

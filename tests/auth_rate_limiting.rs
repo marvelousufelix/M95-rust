@@ -7,9 +7,7 @@ use common::{ensure_merchant, send, state};
 
 #[tokio::test]
 async fn login_requires_valid_email() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
 
     let (status, json) = send(
@@ -26,9 +24,7 @@ async fn login_requires_valid_email() {
 
 #[tokio::test]
 async fn login_invalid_credentials_generic_message() {
-    let Some(_state) = state().await else {
-        return;
-    };
+    let _state = state().await;
     let app = aframp::router(_state.clone());
 
     let (status, json) = send(
@@ -54,9 +50,7 @@ async fn login_invalid_credentials_generic_message() {
 
 #[tokio::test]
 async fn login_rate_limiting_blocks_after_max_attempts() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _merchant_id) = ensure_merchant(&app, "rate_limit_test_user").await;
 
@@ -113,9 +107,7 @@ async fn login_rate_limiting_blocks_after_max_attempts() {
 
 #[tokio::test]
 async fn rate_limiting_includes_retry_after_header() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
 
     let email = "retry_after_test@example.com";
@@ -153,9 +145,7 @@ async fn rate_limiting_includes_retry_after_header() {
 
 #[tokio::test]
 async fn rate_limiting_is_per_email() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let max_attempts = state.config.login_rate_limit.max_attempts;
 
@@ -204,9 +194,7 @@ async fn rate_limiting_is_per_email() {
 
 #[tokio::test]
 async fn rate_limit_resets_on_successful_login() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
 
     // Create a test merchant
@@ -251,9 +239,7 @@ async fn rate_limit_resets_on_successful_login() {
 
 #[tokio::test]
 async fn rate_limiting_does_not_reveal_email_existence() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let max_attempts = state.config.login_rate_limit.max_attempts;
 
@@ -293,9 +279,7 @@ async fn rate_limiting_does_not_reveal_email_existence() {
 
 #[tokio::test]
 async fn valid_login_below_limit_succeeds() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
     let app = aframp::router(state.clone());
     let (token, _merchant_id) = ensure_merchant(&app, "valid_login_test").await;
     let (_status, wallet_json) =
@@ -316,9 +300,7 @@ async fn valid_login_below_limit_succeeds() {
 
 #[tokio::test]
 async fn rate_limit_window_respected() {
-    let Some(_state) = state().await else {
-        return;
-    };
+    let _state = state().await;
     let app = aframp::router(_state.clone());
 
     // This test would verify that attempts outside the window are not counted
@@ -332,9 +314,7 @@ async fn rate_limit_window_respected() {
 
 #[tokio::test]
 async fn rate_limit_configuration_respected() {
-    let Some(state) = state().await else {
-        return;
-    };
+    let state = state().await;
 
     // Verify that the configured limits are applied
     assert!(state.config.login_rate_limit.max_attempts > 0);

@@ -5,15 +5,13 @@ use serde_json::json;
 
 use common::{ensure_merchant, send, state};
 
-async fn app() -> Option<axum::Router> {
-    state().await.map(aframp::router)
+async fn app() -> axum::Router {
+    aframp::router(state().await)
 }
 
 #[tokio::test]
 async fn protected_routes_require_token() {
-    let Some(app) = app().await else {
-        return;
-    };
+    let app = app().await;
     for (method, path) in [
         ("POST", "/wallet/create"),
         ("GET", "/wallet"),
@@ -33,9 +31,7 @@ async fn protected_routes_require_token() {
 
 #[tokio::test]
 async fn create_and_fetch_wallet() {
-    let Some(app) = app().await else {
-        return;
-    };
+    let app = app().await;
     let (token, _) = ensure_merchant(&app, "wallet").await;
 
     let (status, json) = send(
@@ -58,9 +54,7 @@ async fn create_and_fetch_wallet() {
 
 #[tokio::test]
 async fn balance_and_transactions_start_empty() {
-    let Some(app) = app().await else {
-        return;
-    };
+    let app = app().await;
     let (token, _) = ensure_merchant(&app, "empty").await;
 
     let (status, json) = send(app.clone(), "GET", "/balance", Some(&token), None).await;
@@ -74,9 +68,7 @@ async fn balance_and_transactions_start_empty() {
 
 #[tokio::test]
 async fn wallet_address_is_stable_per_merchant() {
-    let Some(app) = app().await else {
-        return;
-    };
+    let app = app().await;
     let (token_a, _) = ensure_merchant(&app, "stable_a").await;
     let (token_b, _) = ensure_merchant(&app, "stable_b").await;
 
