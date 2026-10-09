@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
-use aframp::AppState;
+use aframp::{AppState, LoginRateLimitConfig, SettlementConfig, IssuerConfig};
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::Router;
@@ -53,6 +53,22 @@ pub async fn state() -> Option<AppState> {
             same_site: aframp::SameSite::Lax,
         },
         cngn_issuer: None,
+        login_rate_limit: LoginRateLimitConfig {
+            max_attempts: 5,
+            window_secs: 300,
+        },
+        settlement: SettlementConfig {
+            enabled: false,
+            interval_secs: 300,
+            window_start_utc: None,
+            min_balance_stroops: 1000000,
+            max_retries: 3,
+            issuer: IssuerConfig {
+                api_url: "https://issuer-api.example.com".to_string(),
+                api_key: aframp::SecretString::new("test-key".to_string()),
+                max_timeout_secs: 30,
+            },
+        },
     };
 
     Some(AppState {
@@ -66,6 +82,7 @@ pub async fn state() -> Option<AppState> {
             secure: true,
             same_site: aframp::SameSite::Lax,
         },
+        login_rate_limiter: std::sync::Arc::new(aframp::services::login_rate_limit::LoginRateLimiter::new()),
     })
 }
 

@@ -107,7 +107,7 @@ mod tests {
         builder.body(Body::from(body.to_string())).unwrap()
     }
 
-    async fn status(app: &Router, req: Request<Body>) -> (StatusCode, Value) {
+    async fn send(app: &Router, req: Request<Body>) -> (StatusCode, Value) {
         let res = app.clone().oneshot(req).await.unwrap();
         let status = res.status();
         let bytes = axum::body::to_bytes(res.into_body(), 1024).await.unwrap();
@@ -118,18 +118,18 @@ mod tests {
     #[tokio::test]
     async fn wrong_content_type_with_a_body_is_415() {
         let app = app();
-        let (status, body) = status(&app, request("POST", "/post", Some("text/plain"), "hello")).await;
+        let (status, body) = send(&app, request("POST", "/post", Some("text/plain"), "hello")).await;
         assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
         assert_eq!(body["error"], "content-type must be application/json");
 
-        let (status, _) = status(&app, request("PUT", "/put", Some("application/xml"), "<x/>")).await;
+        let (status, _) = send(&app, request("PUT", "/put", Some("application/xml"), "<x/>")).await;
         assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
 
     #[tokio::test]
     async fn missing_content_type_with_a_body_is_415() {
         let app = app();
-        let (status, body) = status(&app, request("POST", "/post", None, "{}")).await;
+        let (status, body) = send(&app, request("POST", "/post", None, "{}")).await;
         assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
         assert_eq!(body["error"], "content-type must be application/json");
     }
@@ -142,7 +142,7 @@ mod tests {
             "application/json; charset=utf-8",
             "application/vnd.api+json",
         ] {
-            let (status, _) = status(&app, request("POST", "/post", Some(ct), "{}")).await;
+            let (status, _) = send(&app, request("POST", "/post", Some(ct), "{}")).await;
             assert_eq!(status, StatusCode::OK, "rejected {ct}");
         }
     }
@@ -150,14 +150,14 @@ mod tests {
     #[tokio::test]
     async fn bodyless_posts_pass_without_a_content_type() {
         let app = app();
-        let (status, _) = status(&app, request("POST", "/post", None, "")).await;
+        let (status, _) = send(&app, request("POST", "/post", None, "")).await;
         assert_eq!(status, StatusCode::OK);
     }
 
     #[tokio::test]
     async fn non_post_methods_are_unaffected() {
         let app = app();
-        let (status, _) = status(&app, request("GET", "/get", Some("text/plain"), "hello")).await;
+        let (status, _) = send(&app, request("GET", "/get", Some("text/plain"), "hello")).await;
         assert_eq!(status, StatusCode::OK);
     }
 }

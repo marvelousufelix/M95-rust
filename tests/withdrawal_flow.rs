@@ -13,6 +13,14 @@ struct FailingProvider;
 
 #[async_trait]
 impl PaymentProvider for FailingProvider {
+    async fn check_payout_readiness(&self) -> Result<aframp::payments::PayoutReadiness, String> {
+        Ok(aframp::payments::PayoutReadiness {
+            is_ready: true,
+            available_balance: None,
+            message: "mock always ready".into(),
+        })
+    }
+
     async fn create_payout(&self, _req: &PayoutRequest) -> Result<PayoutResult, String> {
         Err("simulated provider failure".into())
     }

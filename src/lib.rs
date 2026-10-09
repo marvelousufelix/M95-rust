@@ -4,13 +4,13 @@ pub mod blockchain;
 mod config;
 mod error;
 mod middleware;
-mod models;
+pub mod models;
 pub mod payments;
 pub mod services;
 mod validation;
 
 pub use auth::cookie::{CookieConfig, SameSite};
-pub use config::{AppConfig, SecretString};
+pub use config::{AppConfig, IssuerConfig, LoginRateLimitConfig, SecretString, SettlementConfig};
 
 use sqlx::{postgres::PgPoolOptions, PgPool};
 

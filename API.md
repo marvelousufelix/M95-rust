@@ -34,12 +34,12 @@ Authorization: Bearer <token>
 
 The header takes precedence when both are present.
 
-Tokens are **HS256, valid for 24 hours** either way. Claims are `sub` (user id), `merchant_id`, `iat`, `exp`.
+Tokens are **HS256, valid for 24 hours** either way. Claims are `sub` (user id), `merchant_id`, `session_id`, `iat`, `exp`.
 
 Two things worth building for up front:
 
 - **`merchant_id` is nullable.** `AuthResponse.merchant_id` and the JWT claim are both optional. Today signup always creates a merchant so it's always present, but the type allows `null` — an account without a merchant gets `400` from every merchant-scoped endpoint, not `401`. Don't assume non-null.
-- **Expiry is silent.** There's no refresh endpoint. When a token expires, calls start returning `401` with `{"error":"invalid or expired token","code":"INVALID_CREDENTIALS"}` — treat any `401` on a previously-working call as "send the user back to login."
+- **Expiry is silent.** There's no refresh endpoint. When a token expires or is revoked, calls start returning `401` with `{"error":"invalid or expired token","code":"INVALID_CREDENTIALS"}` — treat any `401` on a previously-working call as "send the user back to login."
 
 ### CORS
 
@@ -146,7 +146,7 @@ Errors: `401` for both a wrong password and an unknown email — deliberately in
 ### `POST /logout`
 No auth — a browser holding an expired or malformed session still needs to clear it. Returns `204` and a `Set-Cookie` that expires `aframp_session` immediately.
 
-Note this clears the browser's session, it does not revoke the JWT: a token already copied elsewhere stays valid until it expires. There's no server-side revocation list yet.
+**Server-side session revocation:** When a bearer token is provided, the current session is revoked server-side. This invalidates the token for both cookie and bearer-authenticated clients. Revoked sessions are stored in the database and persist across restarts, so the token remains invalid even if the server restarts. Cookie-authenticated clients have their cookie cleared immediately. The JWT's 24-hour expiry acts as a backstop for sessions that are not explicitly revoked.
 
 ### `GET /me`
 Auth required. The signed-in user's profile. The JWT carries only ids, so call this after a reload to render anything human-readable without forcing a re-login.

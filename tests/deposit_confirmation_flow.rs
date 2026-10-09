@@ -47,7 +47,8 @@ async fn deposit_starts_in_detected_status() {
     };
     let db = &state.db;
     let app = aframp::router(state.clone());
-    let (token, merchant_id) = ensure_merchant(&app, "deposit_detected").await;
+    let (token, merchant_id_str) = ensure_merchant(&app, "deposit_detected").await;
+        let merchant_id: Uuid = merchant_id_str.parse().expect("invalid merchant_id uuid");
     let _wallet_address = create_wallet(&app, &token).await;
 
     // Simulate a deposit record by directly inserting into the database
@@ -75,7 +76,8 @@ async fn deposit_transitions_detected_to_verified_with_confirmation_ledger() {
     };
     let db = &state.db;
     let app = aframp::router(state.clone());
-    let (token, merchant_id) = ensure_merchant(&app, "deposit_verified").await;
+    let (token, merchant_id_str) = ensure_merchant(&app, "deposit_verified").await;
+        let merchant_id: Uuid = merchant_id_str.parse().expect("invalid merchant_id uuid");
     let _wallet_address = create_wallet(&app, &token).await;
 
     // Create a detected payment
@@ -115,7 +117,8 @@ async fn balance_added_to_pending_on_verified() {
     };
     let db = &state.db;
     let app = aframp::router(state.clone());
-    let (token, merchant_id) = ensure_merchant(&app, "deposit_pending_balance").await;
+    let (token, merchant_id_str) = ensure_merchant(&app, "deposit_pending_balance").await;
+        let merchant_id: Uuid = merchant_id_str.parse().expect("invalid merchant_id uuid");
     let _wallet_address = create_wallet(&app, &token).await;
 
     // Create and verify a payment
@@ -166,7 +169,8 @@ async fn deposit_with_insufficient_confirmations_stays_verified() {
     };
     let db = &state.db;
     let app = aframp::router(state.clone());
-    let (token, merchant_id) = ensure_merchant(&app, "deposit_insufficient_confirm").await;
+    let (token, merchant_id_str) = ensure_merchant(&app, "deposit_insufficient_confirm").await;
+        let merchant_id: Uuid = merchant_id_str.parse().expect("invalid merchant_id uuid");
     let _wallet_address = create_wallet(&app, &token).await;
 
     // Create a verified payment with confirmation_ledger set
@@ -210,7 +214,8 @@ async fn deposit_with_threshold_reached_moves_to_confirmed() {
     };
     let db = &state.db;
     let app = aframp::router(state.clone());
-    let (token, merchant_id) = ensure_merchant(&app, "deposit_threshold_reached").await;
+    let (token, merchant_id_str) = ensure_merchant(&app, "deposit_threshold_reached").await;
+        let merchant_id: Uuid = merchant_id_str.parse().expect("invalid merchant_id uuid");
     let _wallet_address = create_wallet(&app, &token).await;
 
     // Create a verified payment with confirmation_ledger set
@@ -250,7 +255,8 @@ async fn balance_moves_from_pending_to_available_on_confirmed() {
     };
     let db = &state.db;
     let app = aframp::router(state.clone());
-    let (token, merchant_id) = ensure_merchant(&app, "deposit_balance_move").await;
+    let (token, merchant_id_str) = ensure_merchant(&app, "deposit_balance_move").await;
+        let merchant_id: Uuid = merchant_id_str.parse().expect("invalid merchant_id uuid");
     let _wallet_address = create_wallet(&app, &token).await;
 
     // Create a verified payment and set initial balance to pending
@@ -319,7 +325,8 @@ async fn multiple_payments_at_different_confirmation_stages() {
     };
     let db = &state.db;
     let app = aframp::router(state.clone());
-    let (token, merchant_id) = ensure_merchant(&app, "deposit_multiple_stages").await;
+    let (token, merchant_id_str) = ensure_merchant(&app, "deposit_multiple_stages").await;
+        let merchant_id: Uuid = merchant_id_str.parse().expect("invalid merchant_id uuid");
     let _wallet_address = create_wallet(&app, &token).await;
 
     let current_ledger = 47118600i64;
@@ -411,7 +418,8 @@ async fn balance_unchanged_when_payment_detected() {
     };
     let db = &state.db;
     let app = aframp::router(state.clone());
-    let (token, merchant_id) = ensure_merchant(&app, "deposit_no_balance_on_detect").await;
+    let (token, merchant_id_str) = ensure_merchant(&app, "deposit_no_balance_on_detect").await;
+        let merchant_id: Uuid = merchant_id_str.parse().expect("invalid merchant_id uuid");
     let _wallet_address = create_wallet(&app, &token).await;
 
     // Create a detected payment
