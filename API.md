@@ -186,10 +186,10 @@ Auth required. Generates a **real Stellar ed25519 keypair** for the merchant. Th
 }
 ```
 
-> **Calling this repeatedly creates a new wallet each time.** There's no idempotency guard. `GET /wallet` returns the most recently created one, so a duplicate call silently changes where new payment requests point. Create a wallet once during onboarding and check `GET /wallet` first.
+> **This endpoint is idempotent.** Calling it repeatedly with the same authentication returns the same wallet. The first call generates a keypair; subsequent calls return the existing active wallet. This ensures that retries never change the destination address for new payment requests.
 
 ### `GET /wallet`
-Auth required. The merchant's most recent wallet. Same shape as above.
+Auth required. The merchant's active wallet. Same shape as above.
 
 Errors: `400 "no wallet created yet"` if none exists — that's the signal to run onboarding, not an error to surface raw.
 
